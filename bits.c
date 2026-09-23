@@ -19,7 +19,8 @@
  * Difficulty: 1
  */
 int bitAnd(int x, int y) {
-    return 2;
+    //return 2;
+    return ~(~x | ~y);
 }
 
 /*
@@ -30,7 +31,8 @@ int bitAnd(int x, int y) {
  *   Difficulty: 1
  */
 int bitXor(int x, int y) {
-    return 2;
+    //return 2;
+    return ~(~x & ~y) & ~(x & y);
 }
 
 /*
@@ -50,7 +52,18 @@ int bitXor(int x, int y) {
  *   1 if x and y have the same sign , 0 otherwise.
  */
 int samesign(int x, int y) {
-    return 2;
+    if (!x && !y)
+    {
+        return 1;
+    }
+    else if (x&&y)
+    {
+        return !((x>>31)^(y>>31));
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 /*
@@ -63,7 +76,17 @@ int samesign(int x, int y) {
  *   Difficulty: 4
  */
 int logtwo(int v) {
-    return 2;
+    int r = 0;
+    int t, s;
+
+    t = (v >> 16) > 0;  s = t << 4;  r = r | s;  v = v >> s;
+    t = (v >> 8) > 0;   s = t << 3;  r = r | s;  v = v >> s;
+    t = (v >> 4) > 0;   s = t << 2;  r = r | s;  v = v >> s;
+    t = (v >> 2) > 0;   s = t << 1;  r = r | s;  v = v >> s;
+    t = (v >> 1) > 0;   r = r | t;
+
+    return r;
+
 }
 
 /*
@@ -76,7 +99,14 @@ int logtwo(int v) {
  *    Difficulty: 2
  */
 int byteSwap(int x, int n, int m) {
-    return 2;
+    int a1=n<<3;
+    int a2=m<<3;
+    int b1=(x>>a1)&0xFF;
+    int b2=(x>>a2)&0xFF;
+    int mask=(0xFF<<a1)|(0xFF<<a2);
+    x=x&(~mask);
+    x=x|(b1<<a2)|(b2<<a1);
+    return x;
 }
 
 /*
@@ -88,7 +118,13 @@ int byteSwap(int x, int n, int m) {
  *   Difficulty: 3
  */
 unsigned reverse(unsigned v) {
-    return 2;
+    unsigned r=0;
+    for(int i=0;i!=32;i++)
+    {
+        r=(r<<1)|(v&1);
+        v=v>>1;
+    }
+    return r;
 }
 
 /*
@@ -100,7 +136,9 @@ unsigned reverse(unsigned v) {
  *   Difficulty: 3
  */
 int logicalShift(int x, int n) {
-    return 2;
+    int ori=x>>n;
+    int mask=~(((1<<31)>>n)<<1);
+    return ori&mask;
 }
 
 /*
@@ -112,7 +150,30 @@ int logicalShift(int x, int n) {
  *   Difficulty: 4
  */
 int leftBitCount(int x) {
-    return 2;
+    int y=~x;
+    int count=0;
+    int t;
+
+    t=!!(y>>16);
+    count=count+(t<<4);
+    y=y>>(t<<4);
+
+    t=!!(y>>8);
+    count=count+(t<<3);
+    y=y>>(t<<3);    
+
+    t=!!(y>>4);
+    count=count+(t<<2);
+    y=y>>(t<<2);    
+
+    t=!!(y>>2);
+    count=count+(t<<1);
+    y=y>>(t<<1);
+
+    t=!!(y>>1);
+    count=count+t;
+
+    return 31+~count+1+!y;
 }
 
 /*
@@ -124,7 +185,22 @@ int leftBitCount(int x) {
  *   Difficulty: 4
  */
 unsigned float_i2f(int x) {
-    return 2;
+    if (x == 0) return 0;
+    unsigned s = x & 0x80000000;
+    if (s) x = -x;
+    int e = 31;
+    while (!(x >> 31)) { e = e - 1; x = x << 1; }
+
+    unsigned frac = (x >> 8) & 0x7FFFFF;
+    unsigned drop = x & 0xFF;
+
+    //if (drop > 0x80 || (drop == 0x80 && (frac & 1)))
+    if (drop + (frac & 1) > 0x80) {
+        frac = frac + 1;
+        if (frac == 0x800000) { frac = 0; e = e + 1; }
+    }
+
+    return s | ((e + 127) << 23) | frac;
 }
 
 /*
@@ -139,7 +215,16 @@ unsigned float_i2f(int x) {
  *   Difficulty: 4
  */
 unsigned floatScale2(unsigned uf) {
-    return 2;
+    unsigned exp = (uf >> 23) & 0xFF;
+    unsigned sign = uf & 0x80000000;
+
+    if (exp == 0xFF)
+        return uf;                    //NaN，原样返回
+
+    if (exp == 0)
+        return sign | (uf << 1);      // 0 或非规格化数，尾数左移
+
+    return uf + 0x00800000;           // 正常数，指数 +1
 }
 
 /*
@@ -156,7 +241,20 @@ unsigned floatScale2(unsigned uf) {
  *   Difficulty: 3
  */
 int float64_f2i(unsigned uf1, unsigned uf2) {
-    return 2;
+    int s = uf2 >> 31;
+    int exp = (uf2 >> 20) & 0x7FF;
+    unsigned frac = ((uf2 & 0xFFFFF) << 32) | uf1;
+
+    if (!(exp-0x7FF)) return 0x80000000;   // NaN
+    if (!exp) return 0;                // 0 / 非规格化
+
+    int e = exp - 1023;
+    if (e < 0) return 0;                   // 小于 1
+    if (e >= 31) return 0x80000000;        // 超出 int
+
+    unsigned result = (frac >> (52 - e)) | (1 << e);
+    if (s) result = -result;
+    return result;
 }
 
 /*
@@ -173,5 +271,15 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Difficulty: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+    if (x > 127)
+        return 0x7F800000;
+
+    if (x >= -126)
+        return (x + 127) << 23;
+
+    if (x >= -149)
+        return 1 << (x + 149);
+
+    return 0;//最小非规格化数都表示不了
+
 }
